@@ -37,6 +37,7 @@ MODULES		+= drivers/meas_airspeed
 #MODULES		+= drivers/frsky_telemetry
 MODULES		+= modules/sensors
 MODULES		+= drivers/sonar
+MODULES		+= drivers/px4flow
 MODULES		+= modules/pwm_input
 MODULES		+= modules/pwm_output
 

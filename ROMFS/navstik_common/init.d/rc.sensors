@@ -37,6 +37,9 @@ fi
 # Start Pressure Sensor
 bmp180 start
 
+# px4flow on sensor 3 bus
+px4flow start
+
 # Start Ultrasonic Sensor
 sonar start
 

@@ -212,10 +212,10 @@ MavlinkReceiver::handle_message(mavlink_message_t *msg)
 			handle_message_hil_state_quaternion(msg);
 			break;
 
-		case MAVLINK_MSG_ID_HIL_OPTICAL_FLOW:
+		/*case MAVLINK_MSG_ID_HIL_OPTICAL_FLOW:
 			handle_message_hil_optical_flow(msg);
 			break;
-
+		*/	
 		default:
 			break;
 		}
@@ -378,11 +378,11 @@ MavlinkReceiver::handle_message_optical_flow(mavlink_message_t *msg)
 		orb_publish(ORB_ID(optical_flow), _flow_pub, &f);
 	}
 }
-
+/*
 void
 MavlinkReceiver::handle_message_hil_optical_flow(mavlink_message_t *msg)
 {
-	/* optical flow */
+	// optical flow 
 	mavlink_hil_optical_flow_t flow;
 	mavlink_msg_hil_optical_flow_decode(msg, &flow);
 
@@ -404,7 +404,7 @@ MavlinkReceiver::handle_message_hil_optical_flow(mavlink_message_t *msg)
 		orb_publish(ORB_ID(optical_flow), _flow_pub, &f);
 	}
 
-	/* Use distance value for range finder report */
+	// Use distance value for range finder report
 	struct range_finder_report r;
 	memset(&r, 0, sizeof(f));
 
@@ -422,7 +422,7 @@ MavlinkReceiver::handle_message_hil_optical_flow(mavlink_message_t *msg)
 		orb_publish(ORB_ID(sensor_range_finder), _range_pub, &r);
 	}
 }
-
+*/
 void
 MavlinkReceiver::handle_message_set_mode(mavlink_message_t *msg)
 {

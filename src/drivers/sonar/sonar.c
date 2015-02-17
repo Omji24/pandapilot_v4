@@ -92,8 +92,8 @@ int sonar_thread_main(int argc, char *argv[])
 	cycle_end = false;
 	sync_error = 0;		
 	sonar_trigger();
-	sonar_raw.minimum_distance = 0.1f;
-	sonar_raw.maximum_distance = 4.0f;
+	sonar_raw.minimum_distance = 0.07f;
+	sonar_raw.maximum_distance = 3.0f;
 	uint8_t valid = 0;
 	
 	while(!thread_should_exit)
@@ -110,7 +110,7 @@ int sonar_thread_main(int argc, char *argv[])
 			if (sonar_distance > 4.0f) {
 				sonar_distance = 0.0f;
 				valid = 0;
-			} else if (sonar_distance > 0.1f && sonar_distance <= 4.0f) {
+			} else if (sonar_distance > 0.07f && sonar_distance <= 3.0f) {
 				valid = 1;
 			}
 

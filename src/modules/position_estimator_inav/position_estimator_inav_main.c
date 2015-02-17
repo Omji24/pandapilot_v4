@@ -219,7 +219,7 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 	float x_est[2] = { 0.0f, 0.0f };	// pos, vel
 	float y_est[2] = { 0.0f, 0.0f };	// pos, vel
 	float z_est[2] = { 0.0f, 0.0f };	// pos, vel
-
+	float distance_x = 0.0f;
 	float est_buf[EST_BUF_SIZE][3][2];	// estimated position buffer
 	float R_buf[EST_BUF_SIZE][3][3];	// rotation matrix buffer
 	float R_gps[3][3];					// rotation matrix for GPS correction moment
@@ -488,35 +488,34 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 				}
 			}
 
-			/* optical flow */
-			orb_check(optical_flow_sub, &updated);
-
+			/* Range Finder Sensor (Sonar) */
+			orb_check(range_finder_sub, &updated);
+	
 			if (updated) {
-				orb_copy(ORB_ID(optical_flow), optical_flow_sub, &flow);
+				orb_copy(ORB_ID(sensor_range_finder), range_finder_sub, &range);
 
-				/* calculate time from previous update */
-				float flow_dt = flow_prev > 0 ? (flow.flow_timestamp - flow_prev) * 1e-6f : 0.1f;
-				flow_prev = flow.flow_timestamp;
-
-				if ((flow.ground_distance_m > 0.31f) &&
-					(flow.ground_distance_m < 4.0f) &&
+				if (range.valid = 1 &&
 					(att.R[2][2] > 0.7f) &&
-					(fabsf(flow.ground_distance_m - sonar_prev) > FLT_EPSILON)) {
+					(fabsf(range.distance - sonar_prev) > FLT_EPSILON)) {
 
 					sonar_time = t;
-					sonar_prev = flow.ground_distance_m;
-					corr_sonar = flow.ground_distance_m + surface_offset + z_est[0];
+					sonar_prev = range.distance;
+					//sonar_valid = true;
+					//sonar_valid_time = t;
+										
+					 corr_sonar = range.distance + surface_offset + z_est[0];
 					corr_sonar_filtered += (corr_sonar - corr_sonar_filtered) * params.sonar_filt;
+					//printf("enterd sonar: %0.5f\n",(double)sonar_prev);
 
 					if (fabsf(corr_sonar) > params.sonar_err) {
-						/* correction is too large: spike or new ground level? */
+						// correction is too large: spike or new ground level?  
 						if (fabsf(corr_sonar - corr_sonar_filtered) > params.sonar_err) {
-							/* spike detected, ignore */
+							// spike detected, ignore  
 							corr_sonar = 0.0f;
 							sonar_valid = false;
-
+							//printf("spike\n");
 						} else {
-							/* new ground level */
+							// new ground level  
 							surface_offset -= corr_sonar;
 							surface_offset_rate = 0.0f;
 							corr_sonar = 0.0f;
@@ -528,18 +527,67 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 						}
 
 					} else {
-						/* correction is ok, use it */
+						// correction is ok, use it  
+						sonar_valid_time = t;
+						sonar_valid = true;
+					} 
+				}				
+			}
+
+			/* optical flow */
+			
+			orb_check(optical_flow_sub, &updated);
+			
+			if (updated) {
+				orb_copy(ORB_ID(optical_flow), optical_flow_sub, &flow);
+
+				/* calculate time from previous update */
+				float flow_dt = flow_prev > 0 ? (flow.flow_timestamp - flow_prev) * 1e-6f : 0.1f;
+				flow_prev = flow.flow_timestamp;
+
+				/*if ((flow.ground_distance_m > 0.31f) &&
+					(flow.ground_distance_m < 4.0f) &&
+					(att.R[2][2] > 0.7f) &&
+					(fabsf(flow.ground_distance_m - sonar_prev) > FLT_EPSILON)) {
+
+					sonar_time = t;
+					sonar_prev = flow.ground_distance_m;
+					corr_sonar = flow.ground_distance_m + surface_offset + z_est[0];
+					corr_sonar_filtered += (corr_sonar - corr_sonar_filtered) * params.sonar_filt;
+
+					if (fabsf(corr_sonar) > params.sonar_err) {
+						// correction is too large: spike or new ground level? 
+						if (fabsf(corr_sonar - corr_sonar_filtered) > params.sonar_err) {
+							//spike detected, ignore  
+							corr_sonar = 0.0f;
+							sonar_valid = false;
+
+						} else {
+							// new ground level 
+							surface_offset -= corr_sonar;
+							surface_offset_rate = 0.0f;
+							corr_sonar = 0.0f;
+							corr_sonar_filtered = 0.0f;
+							sonar_valid_time = t;
+							sonar_valid = true;
+							local_pos.surface_bottom_timestamp = t;
+							mavlink_log_info(mavlink_fd, "[inav] new surface level: %.2f", (double)surface_offset);
+						}
+
+					} else {
+						// correction is ok, use it  
 						sonar_valid_time = t;
 						sonar_valid = true;
 					}
 				}
-
+*/
 				float flow_q = flow.quality / 255.0f;
 				float dist_bottom = - z_est[0] - surface_offset;
-
+				//dist_bottom =  sonar_prev;
 				if (dist_bottom > 0.3f && flow_q > params.flow_q_min && (t < sonar_valid_time + sonar_valid_timeout) && att.R[2][2] > 0.7f) {
 					/* distance to surface */
-					float flow_dist = dist_bottom / att.R[2][2];
+					//float flow_dist = dist_bottom / att.R[2][2];
+					float flow_dist = sonar_prev / att.R[2][2];
 					/* check if flow if too large for accurate measurements */
 					/* calculate estimated velocity in body frame */
 					float body_v_est[2] = { 0.0f, 0.0f };
@@ -554,7 +602,7 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 
 					/* convert raw flow to angular flow (rad/s) */
 					float flow_ang[2];
-					flow_ang[0] = flow.flow_raw_x * params.flow_k / 1000.0f / flow_dt;
+					flow_ang[0] = flow.flow_raw_x * params.flow_k / 1000.0f / flow_dt;//changed sign to neg
 					flow_ang[1] = flow.flow_raw_y * params.flow_k / 1000.0f / flow_dt;
 					/* flow measurements vector */
 					float flow_m[3];
@@ -563,7 +611,8 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 					flow_m[2] = z_est[1];
 					/* velocity in NED */
 					float flow_v[2] = { 0.0f, 0.0f };
-
+					distance_x += flow.flow_raw_x * params.flow_k * flow_dist;
+					printf("distance_x: \n", (double)distance_x);
 					/* project measurements vector to NED basis, skip Z component */
 					for (int i = 0; i < 2; i++) {
 						for (int j = 0; j < 3; j++) {
@@ -597,48 +646,7 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 				flow_updates++;
 			}
 
-			/* Range Finder Sensor (Sonar) */
-			orb_check(range_finder_sub, &updated);
-	
-			if (updated) {
-				orb_copy(ORB_ID(sensor_range_finder), range_finder_sub, &range);
-
-				if ((range.distance > range.minimum_distance) &&
-					(range.distance < range.maximum_distance) &&
-					(att.R[2][2] > 0.7f) &&
-					(fabsf(range.distance - sonar_prev) > FLT_EPSILON)) {
-
-					sonar_time = t;
-					sonar_prev = range.distance;
-					corr_sonar = range.distance + surface_offset + z_est[0];
-					corr_sonar_filtered += (corr_sonar - corr_sonar_filtered) * params.sonar_filt;
-
-					if (fabsf(corr_sonar) > params.sonar_err) {
-						/* correction is too large: spike or new ground level? */
-						if (fabsf(corr_sonar - corr_sonar_filtered) > params.sonar_err) {
-							/* spike detected, ignore */
-							corr_sonar = 0.0f;
-							sonar_valid = false;
-
-						} else {
-							/* new ground level */
-							surface_offset -= corr_sonar;
-							surface_offset_rate = 0.0f;
-							corr_sonar = 0.0f;
-							corr_sonar_filtered = 0.0f;
-							sonar_valid_time = t;
-							sonar_valid = true;
-							local_pos.surface_bottom_timestamp = t;
-							mavlink_log_info(mavlink_fd, "[inav] new surface level: %.2f", (double)surface_offset);
-						}
-
-					} else {
-						/* correction is ok, use it */
-						sonar_valid_time = t;
-						sonar_valid = true;
-					}
-				}				
-			}
+			
 
 			/* home position */
 			orb_check(home_position_sub, &updated);
@@ -1004,17 +1012,18 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 			memcpy(z_est, z_est_prev, sizeof(z_est));
 		}
 
-		/* inertial filter correction for altitude */
+		/* inertial filter correction for altitude with baro*/
 		inertial_filter_correct(corr_baro, dt, z_est, 0, params.w_z_baro);
-
+		//printf("baro only- pos: %0.5f, vel: %0.5f \n",(double)z_est[0],(double)z_est[1]);
 		if (use_gps_z) {
 			epv = fminf(epv, gps.epv);
-
+			
 			inertial_filter_correct(corr_gps[2][0], dt, z_est, 0, w_z_gps_p);
 		}
 
 		if (use_sonar_z) {
 			inertial_filter_correct(-sonar_prev - z_est[0], dt, z_est, 0, params.w_z_sonar);
+		     	//printf("baro+sonar- pos: %0.5f, vel: %0.5f \n",(double)z_est[0],(double)z_est[1]);		
 		}
 
 		if (use_vision_z) {

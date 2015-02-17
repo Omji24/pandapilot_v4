@@ -73,14 +73,14 @@
 #include <board_config.h>
 
 /* Configuration Constants */
-#define PX4FLOW_BUS 			PX4_I2C_BUS_EXPANSION
-#define I2C_FLOW_ADDRESS 		0x42 //* 7-bit address. 8-bit address is 0x84
+#define PX4FLOW_BUS 			NAVSTIK_I2C_BUS_SENSORS
+#define I2C_FLOW_ADDRESS 		NAVSTIK_I2C_OBDEV_PX4FLOW //* 7-bit address. 8-bit address is 0x84
 //range 0x42 - 0x49
  
 /* PX4FLOW Registers addresses */
 #define PX4FLOW_REG	0x00		/* Measure Register */
 
-#define PX4FLOW_CONVERSION_INTERVAL 8000 /* 8ms 125Hz */
+#define PX4FLOW_CONVERSION_INTERVAL 5000 /* 8ms 125Hz */
 
 /* oddly, ERROR is not defined for c++ */
 #ifdef ERROR
@@ -491,8 +491,8 @@ PX4FLOW::collect()
 	struct optical_flow_s report;
 	report.flow_comp_x_m = float(flowcx) / 1000.0f;
 	report.flow_comp_y_m = float(flowcy) / 1000.0f;
-	report.flow_raw_x = val[3] << 8 | val[2];
-	report.flow_raw_y = val[5] << 8 | val[4];
+	report.flow_raw_x = -(val[3] << 8 | val[2]);
+	report.flow_raw_y = -(val[5] << 8 | val[4]);
 	report.ground_distance_m = float(gdist) / 1000.0f;
 	report.quality =  val[10];
 	report.sensor_id = 0;

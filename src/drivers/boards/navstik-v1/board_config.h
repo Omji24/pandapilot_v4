@@ -118,7 +118,7 @@ __BEGIN_DECLS
 #define NAVSTIK_I2C_OBDEV_BMP180	0x77	// Static pressure sensor
 #define NAVSTIK_I2C_OBDEV_MS4515	0x28	// Differential pressure sensor (optional component)
 #define NAVSTIK_I2C_OBDEV_MPU60x0	0x69	// Accelerometer + Gyro
-
+#define NAVSTIK_I2C_OBDEV_PX4FLOW	0x42
 /* User GPIOs
  *
  * GPIO0-1 are the buffered high-power GPIOs.

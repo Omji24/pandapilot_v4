@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2012 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2013-2015 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,63 +32,51 @@
  ****************************************************************************/
 
 /**
- * @file drv_sensor.h
- *
- * Common sensor API and ioctl definitions.
+ * @file i2c_frame.h
+ * Definition of i2c frames.
+ * @author Thomas Boehm <thomas.boehm@fortiss.org>
+ * @author James Goppert <james.goppert@gmail.com>
  */
 
-#ifndef _DRV_SENSOR_H
-#define _DRV_SENSOR_H
+#ifndef I2C_FRAME_H_
+#define I2C_FRAME_H_
+#include <inttypes.h>
 
-#include <stdint.h>
-#include <sys/ioctl.h>
 
-/*
- * ioctl() definitions
- *
- * Note that a driver may not implement all of these operations, but
- * if the operation is implemented it should conform to this API.
- */
+typedef  struct i2c_frame
+{
+    uint16_t frame_count;
+    int16_t pixel_flow_x_sum;
+    int16_t pixel_flow_y_sum;
+    int16_t flow_comp_m_x;
+    int16_t flow_comp_m_y;
+    int16_t qual;
+    int16_t gyro_x_rate;
+    int16_t gyro_y_rate;
+    int16_t gyro_z_rate;
+    uint8_t gyro_range;
+    uint8_t sonar_timestamp;
+    int16_t ground_distance;
+} i2c_frame;
 
-#define _SENSORIOCBASE		(0x2000)
-#define _SENSORIOC(_n)		(_IOC(_SENSORIOCBASE, _n))
+#define I2C_FRAME_SIZE (sizeof(i2c_frame))
 
-/**
- * Set the driver polling rate to (arg) Hz, or one of the SENSOR_POLLRATE
- * constants
- */
-#define SENSORIOCSPOLLRATE	_SENSORIOC(0)
 
-/**
- * Return the driver's approximate polling rate in Hz, or one of the
- * SENSOR_POLLRATE values.
- */
-#define SENSORIOCGPOLLRATE	_SENSORIOC(1)
+typedef struct i2c_integral_frame
+{
+    uint16_t frame_count_since_last_readout;
+    int16_t pixel_flow_x_integral;
+    int16_t pixel_flow_y_integral;
+    int16_t gyro_x_rate_integral;
+    int16_t gyro_y_rate_integral;
+    int16_t gyro_z_rate_integral;
+    uint32_t integration_timespan;
+    uint32_t sonar_timestamp;
+    uint16_t ground_distance;
+    int16_t gyro_temperature;
+    uint8_t qual;
+} i2c_integral_frame;
 
-#define SENSOR_POLLRATE_MANUAL		1000000	/**< poll when read */
-#define SENSOR_POLLRATE_EXTERNAL	1000001	/**< poll when device signals ready */
-#define SENSOR_POLLRATE_MAX		1000002	/**< poll at device maximum rate */
-#define SENSOR_POLLRATE_DEFAULT		1000003	/**< poll at driver normal rate */
+#define I2C_INTEGRAL_FRAME_SIZE (sizeof(i2c_integral_frame))
 
-/**
- * Set the internal queue depth to (arg) entries, must be at least 1
- *
- * This sets the upper bound on the number of readings that can be
- * read from the driver.
- */
-#define SENSORIOCSQUEUEDEPTH	_SENSORIOC(2)
-
-/** return the internal queue depth */
-#define SENSORIOCGQUEUEDEPTH	_SENSORIOC(3)
-
-/**
- * Reset the sensor to its default configuration.
- */
-#define SENSORIOCRESET		_SENSORIOC(4)
-
-#define SENSORIOCSROTATION	_SENSORIOC(5)
-/**
-* Get the sensor orientation
-*/
-#define SENSORIOCGROTATION	_SENSORIOC(6)
-#endif /* _DRV_SENSOR_H */
+#endif /* I2C_FRAME_H_ */

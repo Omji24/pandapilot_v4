@@ -68,6 +68,8 @@
 
 #include <mathlib/mathlib.h>
 
+#include <conversion/rotation.h>
+
 #include <systemlib/param/param.h>
 #include <systemlib/systemlib.h>
 #include <systemlib/err.h>
@@ -144,8 +146,8 @@ MavlinkReceiver::handle_message(mavlink_message_t *msg)
 		handle_message_command_int(msg);
 		break;
 
-	case MAVLINK_MSG_ID_OPTICAL_FLOW:
-		handle_message_optical_flow(msg);
+	case MAVLINK_MSG_ID_OPTICAL_FLOW_RAD:
+		handle_message_optical_flow_rad(msg);
 		break;
 
 	case MAVLINK_MSG_ID_SET_MODE:
@@ -212,10 +214,10 @@ MavlinkReceiver::handle_message(mavlink_message_t *msg)
 			handle_message_hil_state_quaternion(msg);
 			break;
 
-		/*case MAVLINK_MSG_ID_HIL_OPTICAL_FLOW:
+		case MAVLINK_MSG_ID_HIL_OPTICAL_FLOW:
 			handle_message_hil_optical_flow(msg);
 			break;
-		*/	
+		
 		default:
 			break;
 		}
@@ -352,24 +354,34 @@ MavlinkReceiver::handle_message_command_int(mavlink_message_t *msg)
 }
 
 void
-MavlinkReceiver::handle_message_optical_flow(mavlink_message_t *msg)
+MavlinkReceiver::handle_message_optical_flow_rad(mavlink_message_t *msg)
 {
 	/* optical flow */
-	mavlink_optical_flow_t flow;
-	mavlink_msg_optical_flow_decode(msg, &flow);
+	mavlink_optical_flow_rad_t flow;
+	mavlink_msg_optical_flow_rad_decode(msg, &flow);
+
+	enum Rotation flow_rot;
+	param_get(param_find("SENS_FLOW_ROT"),&flow_rot);
 
 	struct optical_flow_s f;
 	memset(&f, 0, sizeof(f));
 
-	f.timestamp = hrt_absolute_time();
-	f.flow_timestamp = flow.time_usec;
-	f.flow_raw_x = flow.flow_x;
-	f.flow_raw_y = flow.flow_y;
-	f.flow_comp_x_m = flow.flow_comp_m_x;
-	f.flow_comp_y_m = flow.flow_comp_m_y;
-	f.ground_distance_m = flow.ground_distance;
+	f.timestamp = flow.time_usec;
+	f.integration_timespan = flow.integration_time_us;
+	f.pixel_flow_x_integral = flow.integrated_x;
+	f.pixel_flow_y_integral = flow.integrated_y;
+	f.gyro_x_rate_integral = flow.integrated_xgyro;
+	f.gyro_y_rate_integral = flow.integrated_ygyro;
+	f.gyro_z_rate_integral = flow.integrated_zgyro;
+	f.time_since_last_sonar_update = flow.time_delta_distance_us;
+	f.ground_distance_m = flow.distance;
 	f.quality = flow.quality;
 	f.sensor_id = flow.sensor_id;
+	f.gyro_temperature = flow.temperature;
+
+	/* rotate measurements according to parameter */
+	float zeroval = 0.0f;
+	rotate_3f(flow_rot, f.pixel_flow_x_integral, f.pixel_flow_y_integral, zeroval);
 
 	if (_flow_pub < 0) {
 		_flow_pub = orb_advertise(ORB_ID(optical_flow), &f);
@@ -378,24 +390,30 @@ MavlinkReceiver::handle_message_optical_flow(mavlink_message_t *msg)
 		orb_publish(ORB_ID(optical_flow), _flow_pub, &f);
 	}
 }
-/*
+
+
 void
 MavlinkReceiver::handle_message_hil_optical_flow(mavlink_message_t *msg)
 {
-	// optical flow 
+	/* optical flow */
 	mavlink_hil_optical_flow_t flow;
 	mavlink_msg_hil_optical_flow_decode(msg, &flow);
 
 	struct optical_flow_s f;
 	memset(&f, 0, sizeof(f));
 
-	f.timestamp = hrt_absolute_time();
-	f.flow_timestamp = flow.time_usec;
-	f.flow_raw_x = flow.integrated_x;
-	f.flow_raw_y = flow.integrated_y;
+	f.timestamp = hrt_absolute_time(); // XXX we rely on the system time for now and not flow.time_usec;
+	f.integration_timespan = flow.integration_time_us;
+	f.pixel_flow_x_integral = flow.integrated_x;
+	f.pixel_flow_y_integral = flow.integrated_y;
+	f.gyro_x_rate_integral = flow.integrated_xgyro;
+	f.gyro_y_rate_integral = flow.integrated_ygyro;
+	f.gyro_z_rate_integral = flow.integrated_zgyro;
+	f.time_since_last_sonar_update = flow.time_delta_distance_us;
 	f.ground_distance_m = flow.distance;
 	f.quality = flow.quality;
 	f.sensor_id = flow.sensor_id;
+	f.gyro_temperature = flow.temperature;
 
 	if (_flow_pub < 0) {
 		_flow_pub = orb_advertise(ORB_ID(optical_flow), &f);
@@ -404,9 +422,9 @@ MavlinkReceiver::handle_message_hil_optical_flow(mavlink_message_t *msg)
 		orb_publish(ORB_ID(optical_flow), _flow_pub, &f);
 	}
 
-	// Use distance value for range finder report
+	/* Use distance value for range finder report */
 	struct range_finder_report r;
-	memset(&r, 0, sizeof(f));
+	memset(&r, 0, sizeof(r));
 
 	r.timestamp = hrt_absolute_time();
 	r.error_count = 0;
@@ -422,7 +440,7 @@ MavlinkReceiver::handle_message_hil_optical_flow(mavlink_message_t *msg)
 		orb_publish(ORB_ID(sensor_range_finder), _range_pub, &r);
 	}
 }
-*/
+
 void
 MavlinkReceiver::handle_message_set_mode(mavlink_message_t *msg)
 {
